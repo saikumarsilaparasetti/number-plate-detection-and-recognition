@@ -4,7 +4,12 @@ from skimage.filters import threshold_local
 import tensorflow as tf
 from skimage import measure
 import imutils
-
+import requests
+from PIL import Image, ImageFont, ImageDraw
+import winsound
+import time
+import psutil
+import matplotlib.pyplot as plt
 def sort_cont(character_contours):
     """
     To sort contours from left to right
@@ -106,8 +111,8 @@ def segment_chars(plate_img, fixed_width):
 
 class PlateFinder:
     def __init__(self):
-        self.min_area = 4500  # minimum area of the plate
-        self.max_area = 30000  # maximum area of the plate
+        self.min_area = 5500  # minimum area of the plate
+        self.max_area = 40000  # maximum area of the plate
 
         self.element_structure = cv2.getStructuringElement(shape=cv2.MORPH_RECT, ksize=(22, 3))
 
@@ -306,16 +311,115 @@ class NeuralNetwork:
             plate = plate + self.label_image(self.convert_tensor(img, imageSizeOuput))
         return plate, len(plate)
 
+######################subsetsum##########################
 
+def display(lis):
+    global risk
+    global remarks
+    remarks=''
+    risk = 0
+    for i in lis:
+        risk+=dictonary.get(i)[1]
+        remarks+=(dictonary.get(i)[0]+'\n')
+    risk//=len(lis)
+    print(risk)
+    
+def printSubsetsRec(arr,i,sum,lis):
+    if(i==0 and sum!=0 and dp[0][sum]):
+        lis.append(arr[i])
+        display(lis)
+        lis=[]
+        return
+    if(i==0 and sum==0):
+        display(lis)
+        lis=[]
+        return
+    if(dp[i-1][sum]):
+        b=list(lis)
+        printSubsetsRec(arr,i-1,sum,b)
+    if(sum>=arr[i] and dp[i-1][sum-arr[i]]):
+        lis.append(arr[i])
+        printSubsetsRec(arr,i-1,sum-arr[i],lis)
+        
+    
+
+def printSubsets(arr,n,sum):
+    if n==0 or sum<0:
+        return
+    
+    
+    for i in range(n):
+        for j in range(sum+1):
+            dp[i][j]=False
+
+    for i in range(n):
+        dp[i][0]=True
+
+    if arr[0]<=sum:
+        dp[0][arr[0]]=True
+
+    for i in range(1,n):
+        for j in range(sum+1):
+            dp[i][j] = (dp[i-1][j] or dp[i-1][j-arr[i]]) if(arr[i]<=j) else dp[i-1][j]
+
+    if dp[n-1][sum]==False:
+        print('No challans found')
+        return 0
+
+    
+    printSubsetsRec(arr,n-1,sum,[])
+
+    
+    
+
+
+#arr=[1,2,3,4,5]
+#sum=10
+dp=[]
+def subsetSum(arr,n,sum):
+    global dp
+    dp=[[False for i in range(sum+1)] for j in range(len(arr))]
+    printSubsets(arr,n,sum)
+#printSubsets(arr,len(arr),sum)
+
+
+#################end of subset sum#######################
+
+
+def predictRisk(response):
+    global dictonary
+    dictonary={10000:['drunk&drive',10],100:['overloading',8],400:['over speeding',9],1000:['dangerous driving',9],500:['driving without license',6],1500:['driving without insurence',4],800:['signal jump',7],500:['no helmet',4],12000:['no permit',6],25000:['juvenile driving',9]}
+    #print(dictonary)
+    if list(response.keys()).count('challanDetails') == 1 or len(response.keys())==0:
+        return 0
+    amount = response['amount']
+    subsetSum(list(dictonary.keys()),len(list(dictonary.keys())),amount)
+    #return amount
+
+
+def show_img():
+    img = Image.open('image_.jpg')
+    d1 = ImageDraw.Draw(img)
+    myFont = ImageFont.truetype('E:/PythonPillow/Fonts/arial.ttf', 40)
+    d1.text((0, 0), "Sample text", font=myFont, fill =(255, 0, 0))
+    img.show()
+    img.save("images/image_text.jpg")
+    ArithmeticError
 if __name__ == "__main__":
+    #show_img()
+    global risk
+    global remarks
+    #risk=0
     findPlate = PlateFinder()
-
+    #URL='https://challan-api.herokuapp.com/'
+    URL = 'https://api.apiclub.in/api/v1/challan_info/'
     # Initialize the Neural Network
     model = NeuralNetwork()
-
-    cap = cv2.VideoCapture('test_videos/test.MOV')
+    dict_=dict()
+    cap = cv2.VideoCapture('./test_videos/test-1.MOV')
     while (cap.isOpened()):
         ret, img = cap.read()
+        #img=cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
         if ret == True:
             cv2.imshow('original video', img)
             if cv2.waitKey(25) & 0xFF == ord('q'):
@@ -326,11 +430,35 @@ if __name__ == "__main__":
                 for i, p in enumerate(possible_plates):
                     chars_on_plate = findPlate.char_on_plate[i]
                     recognized_plate, _ = model.label_image_list(chars_on_plate, imageSizeOuput=128)
-                    print(recognized_plate)
+                    #print(recognized_plate)
+                    #print(list(dict_.keys()).count(recognized_plate)==0)
+                    if list(dict_.keys()).count(recognized_plate)==0:
+                        recognized_plate='dl5sca6998'
+                        dict_[recognized_plate]=''
+                        print(recognized_plate)
+                        
+                        PARAMS = {'number_plate' : recognized_plate}
+                        #URL+='dl5sca6998'
+                        response = requests.get(url = URL+recognized_plate, headers={'Referer':'157.48.160.115','API-KEY':'0da35e1a70835679a3104105473afaa7'})
+                        #response={'response':dict()}
+                        data = response.json()
+                        #data=response
+                        predictRisk(data['response'])
+                        
+                        img=Image.fromarray(img)
+                        d1 = ImageDraw.Draw(img)
+                        myFont = ImageFont.truetype('E:/PythonPillow/Fonts/arial.ttf', 40)
+                        if risk > 5:
+                            d1.text((0, 0),'Vehicle number:'+recognized_plate+'\nPredicted Risk :'+str(risk)+'\nRemarks found :'+remarks, font=myFont, fill =(255, 0, 0))
+                            #img.show()
+                            plt.imshow(img)
+                            winsound.Beep(600, 3000)
+                            #time.sleep(1)
+                            plt.pause(5)
+                            plt.close()
                     cv2.imshow('plate', p)
                     if cv2.waitKey(25) & 0xFF == ord('q'):
                         break
-
 
         else:
             break
