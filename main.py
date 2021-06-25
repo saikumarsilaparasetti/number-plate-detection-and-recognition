@@ -10,6 +10,7 @@ import winsound
 import time
 import psutil
 import matplotlib.pyplot as plt
+import FindPlateFunction
 def sort_cont(character_contours):
     """
     To sort contours from left to right
@@ -426,11 +427,12 @@ if __name__ == "__main__":
                 break
             # cv2.waitKey(0)
             possible_plates = findPlate.find_possible_plates(img)
+            #possible_plates=FindPlateFunction.findPlate(img)
             if possible_plates is not None:
                 for i, p in enumerate(possible_plates):
                     chars_on_plate = findPlate.char_on_plate[i]
                     recognized_plate, _ = model.label_image_list(chars_on_plate, imageSizeOuput=128)
-                    #print(recognized_plate)
+                    print(recognized_plate)
                     #print(list(dict_.keys()).count(recognized_plate)==0)
                     if list(dict_.keys()).count(recognized_plate)==0:
                         recognized_plate='dl5sca6998'
@@ -444,7 +446,7 @@ if __name__ == "__main__":
                         data = response.json()
                         #data=response
                         predictRisk(data['response'])
-                        
+                        print(type(img))
                         img=Image.fromarray(img)
                         d1 = ImageDraw.Draw(img)
                         myFont = ImageFont.truetype('E:/PythonPillow/Fonts/arial.ttf', 40)
@@ -456,6 +458,8 @@ if __name__ == "__main__":
                             #time.sleep(1)
                             plt.pause(5)
                             plt.close()
+                            if cv2.waitKey(25) & 0xFF == ord("q"):
+                                break
                     cv2.imshow('plate', p)
                     if cv2.waitKey(25) & 0xFF == ord('q'):
                         break
